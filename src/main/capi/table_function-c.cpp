@@ -321,6 +321,22 @@ void duckdb_table_function_supports_projection_pushdown(duckdb_table_function ta
 	tf.projection_pushdown = pushdown;
 }
 
+void duckdb_table_function_supports_filter_pushdown(duckdb_table_function table_function, bool pushdown) {
+	if (!table_function) {
+		return;
+	}
+	auto &tf = GetCTableFunction(table_function);
+	tf.filter_pushdown = pushdown;
+}
+
+void duckdb_table_function_supports_filter_prune(duckdb_table_function table_function, bool prune) {
+	if (!table_function) {
+		return;
+	}
+	auto &tf = GetCTableFunction(table_function);
+	tf.filter_prune = prune;
+}
+
 duckdb_state duckdb_register_table_function(duckdb_connection connection, duckdb_table_function function) {
 	if (!connection || !function) {
 		return DuckDBError;

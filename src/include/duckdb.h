@@ -3905,7 +3905,29 @@ If this is set to false (the default), the system will expect all columns to be 
 * @param pushdown True if the table function supports projection pushdown, false otherwise.
 */
 DUCKDB_C_API void duckdb_table_function_supports_projection_pushdown(duckdb_table_function table_function,
-                                                                     bool pushdown);
+																	 bool pushdown);
+/*!
+Sets whether or not the given table function supports filter pushdown.
+
+Whether or not the table function supports filter pushdown. If not supported a filter will be added
+that applies the table filter directly.
+
+* @param table_function The table function
+* @param pushdown True if the table function supports filter pushdown, false otherwise.
+*/
+DUCKDB_C_API void duckdb_table_function_supports_filter_pushdown(duckdb_table_function table_function,
+																	 bool pushdown);
+/*!
+Sets whether or not the given table function supports filter prune.
+
+Whether or not the table function can immediately prune out filter columns that are unused in the remainder of
+the query plan, e.g., "SELECT i FROM tbl WHERE j = 42;" - j does not need to leave the table function at all
+
+* @param table_function The table function
+* @param pushdown True if the table function supports filter prune, false otherwise.
+*/
+DUCKDB_C_API void duckdb_table_function_supports_filter_prune(duckdb_table_function table_function,
+																	 bool pushdown);
 
 /*!
 Register the table function object within the given connection.
