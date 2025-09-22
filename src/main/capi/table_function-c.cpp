@@ -6,6 +6,8 @@
 #include "duckdb/main/client_context.hpp"
 #include "duckdb/parser/parsed_data/create_table_function_info.hpp"
 #include "duckdb/storage/statistics/node_statistics.hpp"
+#include "duckdb/planner/filter/constant_filter.hpp"
+#include "duckdb/planner/filter/conjunction_filter.hpp"
 
 namespace duckdb {
 
@@ -115,6 +117,31 @@ struct CTableInternalFunctionInfo {
 	string error;
 };
 
+struct CTableFilterNode {
+        CTableFilterNode(idx_t column_index, TableFilterType filter_type)
+            : column_index(column_index), filter_type(filter_type), comparison_type(ExpressionType::INVALID),
+              has_comparison(false) {
+        }
+
+        idx_t column_index;
+        TableFilterType filter_type;
+        ExpressionType comparison_type;
+        bool has_comparison;
+        Value constant;
+        vector<unique_ptr<CTableFilterNode>> children;
+
+        unique_ptr<CTableFilterNode> Copy() const {
+                auto result = make_uniq<CTableFilterNode>(column_index, filter_type);
+                result->comparison_type = comparison_type;
+                result->has_comparison = has_comparison;
+                result->constant = constant;
+                for (auto &child : children) {
+                        result->children.push_back(child->Copy());
+                }
+                return result;
+        }
+};
+
 //===--------------------------------------------------------------------===//
 // Helper Functions
 //===--------------------------------------------------------------------===//
@@ -150,12 +177,120 @@ duckdb_function_info ToCTableFunctionInfo(duckdb::CTableInternalFunctionInfo &in
 	return reinterpret_cast<duckdb_function_info>(&info);
 }
 
+static duckdb::CTableFilterNode *GetCTableFunctionFilter(duckdb_table_function_filter filter) {
+        return reinterpret_cast<duckdb::CTableFilterNode *>(filter);
+}
+
+static duckdb_table_function_filter ToCTableFunctionFilter(duckdb::CTableFilterNode *filter) {
+        return reinterpret_cast<duckdb_table_function_filter>(filter);
+}
+
+static bool ExpressionTypeToFilterOperator(ExpressionType type, duckdb_table_filter_operator &result) {
+        switch (type) {
+        case ExpressionType::COMPARE_EQUAL:
+                result = DUCKDB_TABLE_FILTER_OPERATOR_EQUAL;
+                return true;
+	case ExpressionType::COMPARE_NOTEQUAL:
+		result = DUCKDB_TABLE_FILTER_OPERATOR_NOT_EQUAL;
+		return true;
+	case ExpressionType::COMPARE_GREATERTHAN:
+		result = DUCKDB_TABLE_FILTER_OPERATOR_GREATER_THAN;
+		return true;
+	case ExpressionType::COMPARE_GREATERTHANOREQUALTO:
+		result = DUCKDB_TABLE_FILTER_OPERATOR_GREATER_THAN_OR_EQUAL;
+		return true;
+	case ExpressionType::COMPARE_LESSTHAN:
+		result = DUCKDB_TABLE_FILTER_OPERATOR_LESS_THAN;
+		return true;
+	case ExpressionType::COMPARE_LESSTHANOREQUALTO:
+		result = DUCKDB_TABLE_FILTER_OPERATOR_LESS_THAN_OR_EQUAL;
+		return true;
+	default:
+		result = DUCKDB_TABLE_FILTER_OPERATOR_INVALID;
+		return false;
+        }
+}
+
+static duckdb_table_filter_type TableFilterTypeToFilterType(TableFilterType type) {
+        switch (type) {
+        case TableFilterType::CONSTANT_COMPARISON:
+                return DUCKDB_TABLE_FILTER_TYPE_CONSTANT_COMPARISON;
+        case TableFilterType::CONJUNCTION_AND:
+                return DUCKDB_TABLE_FILTER_TYPE_CONJUNCTION_AND;
+        case TableFilterType::CONJUNCTION_OR:
+                return DUCKDB_TABLE_FILTER_TYPE_CONJUNCTION_OR;
+        default:
+                return DUCKDB_TABLE_FILTER_TYPE_INVALID;
+        }
+}
+
+static unique_ptr<CTableFilterNode> ExtractFilterNode(idx_t column_index, const TableFilter &filter) {
+        switch (filter.filter_type) {
+        case TableFilterType::CONSTANT_COMPARISON: {
+                auto &constant_filter = filter.Cast<ConstantFilter>();
+                duckdb_table_filter_operator op;
+                if (!ExpressionTypeToFilterOperator(constant_filter.comparison_type, op)) {
+                        return nullptr;
+                }
+                auto result = make_uniq<CTableFilterNode>(column_index, TableFilterType::CONSTANT_COMPARISON);
+                result->comparison_type = constant_filter.comparison_type;
+                result->has_comparison = true;
+                result->constant = constant_filter.constant;
+                return result;
+        }
+        case TableFilterType::CONJUNCTION_AND: {
+                auto &and_filter = filter.Cast<ConjunctionAndFilter>();
+                auto result = make_uniq<CTableFilterNode>(column_index, TableFilterType::CONJUNCTION_AND);
+                for (auto &child : and_filter.child_filters) {
+                        auto child_node = ExtractFilterNode(column_index, *child);
+                        if (!child_node) {
+                                return nullptr;
+                        }
+                        result->children.push_back(std::move(child_node));
+                }
+                return result;
+        }
+        case TableFilterType::CONJUNCTION_OR: {
+                auto &or_filter = filter.Cast<ConjunctionOrFilter>();
+                auto result = make_uniq<CTableFilterNode>(column_index, TableFilterType::CONJUNCTION_OR);
+                for (auto &child : or_filter.child_filters) {
+                        auto child_node = ExtractFilterNode(column_index, *child);
+                        if (!child_node) {
+                                return nullptr;
+                        }
+                        result->children.push_back(std::move(child_node));
+                }
+                return result;
+        }
+        default:
+                return nullptr;
+        }
+}
+
+static vector<unique_ptr<CTableFilterNode>> ExtractFilters(optional_ptr<TableFilterSet> filters) {
+        vector<unique_ptr<CTableFilterNode>> result;
+        if (!filters) {
+                return result;
+        }
+        for (auto &entry : filters->filters) {
+                if (!entry.second) {
+                        continue;
+                }
+                auto filter_node = ExtractFilterNode(entry.first, *entry.second);
+                if (!filter_node) {
+                        continue;
+                }
+                result.push_back(std::move(filter_node));
+        }
+        return result;
+}
+
 //===--------------------------------------------------------------------===//
 // Table Function Callbacks
 //===--------------------------------------------------------------------===//
 
 unique_ptr<FunctionData> CTableFunctionBind(ClientContext &context, TableFunctionBindInput &input,
-                                            vector<LogicalType> &return_types, vector<string> &names) {
+					    vector<LogicalType> &return_types, vector<string> &names) {
 	auto &info = input.info->Cast<CTableFunctionInfo>();
 	D_ASSERT(info.bind && info.function && info.init);
 
@@ -182,7 +317,7 @@ unique_ptr<GlobalTableFunctionState> CTableFunctionInit(ClientContext &context, 
 }
 
 unique_ptr<LocalTableFunctionState> CTableFunctionLocalInit(ExecutionContext &context, TableFunctionInitInput &data_p,
-                                                            GlobalTableFunctionState *gstate) {
+							    GlobalTableFunctionState *gstate) {
 	auto &bind_data = data_p.bind_data->Cast<CTableBindData>();
 	auto result = make_uniq<CTableLocalInitData>();
 	if (!bind_data.info.local_init) {
@@ -257,7 +392,7 @@ void duckdb_table_function_add_parameter(duckdb_table_function function, duckdb_
 }
 
 void duckdb_table_function_add_named_parameter(duckdb_table_function function, const char *name,
-                                               duckdb_logical_type type) {
+					       duckdb_logical_type type) {
 	if (!function || !type) {
 		return;
 	}
@@ -267,7 +402,7 @@ void duckdb_table_function_add_named_parameter(duckdb_table_function function, c
 }
 
 void duckdb_table_function_set_extra_info(duckdb_table_function function, void *extra_info,
-                                          duckdb_delete_callback_t destroy) {
+					  duckdb_delete_callback_t destroy) {
 	if (!function) {
 		return;
 	}
@@ -319,6 +454,14 @@ void duckdb_table_function_supports_projection_pushdown(duckdb_table_function ta
 	}
 	auto &tf = GetCTableFunction(table_function);
 	tf.projection_pushdown = pushdown;
+}
+
+void duckdb_table_function_supports_filter_pushdown(duckdb_table_function table_function, bool pushdown) {
+	if (!table_function) {
+		return;
+	}
+	auto &tf = GetCTableFunction(table_function);
+	tf.filter_pushdown = pushdown;
 }
 
 duckdb_state duckdb_register_table_function(duckdb_connection connection, duckdb_table_function function) {
@@ -508,6 +651,126 @@ idx_t duckdb_init_get_column_index(duckdb_init_info info, idx_t column_index) {
 		return 0;
 	}
 	return init_info.column_ids[column_index];
+}
+
+idx_t duckdb_init_get_filter_count(duckdb_init_info info) {
+        if (!info) {
+                return 0;
+        }
+        auto &init_info = GetCInitInfo(info);
+        auto filters = ExtractFilters(init_info.filters);
+        return filters.size();
+}
+
+duckdb_state duckdb_init_get_filter(duckdb_init_info info, idx_t filter_index, duckdb_table_function_filter *out_filter) {
+        if (!info || !out_filter) {
+                return DuckDBError;
+        }
+        *out_filter = nullptr;
+
+        auto &init_info = GetCInitInfo(info);
+        auto filters = ExtractFilters(init_info.filters);
+        if (filter_index >= filters.size()) {
+                return DuckDBError;
+        }
+        auto filter_handle = filters[filter_index].release();
+        *out_filter = ToCTableFunctionFilter(filter_handle);
+        return DuckDBSuccess;
+}
+
+idx_t duckdb_table_function_filter_get_column_index(duckdb_table_function_filter filter) {
+        if (!filter) {
+                return 0;
+        }
+        auto *internal = GetCTableFunctionFilter(filter);
+        if (!internal) {
+                return 0;
+        }
+        return internal->column_index;
+}
+
+duckdb_table_filter_type duckdb_table_function_filter_get_type(duckdb_table_function_filter filter) {
+        if (!filter) {
+                return DUCKDB_TABLE_FILTER_TYPE_INVALID;
+        }
+        auto *internal = GetCTableFunctionFilter(filter);
+        if (!internal) {
+                return DUCKDB_TABLE_FILTER_TYPE_INVALID;
+        }
+        return TableFilterTypeToFilterType(internal->filter_type);
+}
+
+duckdb_table_filter_operator duckdb_table_function_filter_get_operator(duckdb_table_function_filter filter) {
+        if (!filter) {
+                return DUCKDB_TABLE_FILTER_OPERATOR_INVALID;
+        }
+        auto *internal = GetCTableFunctionFilter(filter);
+        if (!internal) {
+                return DUCKDB_TABLE_FILTER_OPERATOR_INVALID;
+        }
+        if (!internal->has_comparison) {
+                return DUCKDB_TABLE_FILTER_OPERATOR_INVALID;
+        }
+        duckdb_table_filter_operator result;
+        if (!ExpressionTypeToFilterOperator(internal->comparison_type, result)) {
+                return DUCKDB_TABLE_FILTER_OPERATOR_INVALID;
+        }
+        return result;
+}
+
+duckdb_value duckdb_table_function_filter_get_constant(duckdb_table_function_filter filter) {
+        if (!filter) {
+                return nullptr;
+        }
+        auto *internal = GetCTableFunctionFilter(filter);
+        if (!internal) {
+                return nullptr;
+        }
+        if (!internal->has_comparison) {
+                return nullptr;
+        }
+        return reinterpret_cast<duckdb_value>(new Value(internal->constant));
+}
+
+idx_t duckdb_table_function_filter_get_child_count(duckdb_table_function_filter filter) {
+        if (!filter) {
+                return 0;
+        }
+        auto *internal = GetCTableFunctionFilter(filter);
+        if (!internal) {
+                return 0;
+        }
+        return internal->children.size();
+}
+
+duckdb_state duckdb_table_function_filter_get_child(duckdb_table_function_filter filter, idx_t index,
+                                                    duckdb_table_function_filter *out_child) {
+        if (!filter || !out_child) {
+                return DuckDBError;
+        }
+        *out_child = nullptr;
+        auto *internal = GetCTableFunctionFilter(filter);
+        if (!internal) {
+                return DuckDBError;
+        }
+        if (index >= internal->children.size()) {
+                return DuckDBError;
+        }
+        auto child_copy = internal->children[index]->Copy();
+        if (!child_copy) {
+                return DuckDBError;
+        }
+        *out_child = ToCTableFunctionFilter(child_copy.release());
+        return DuckDBSuccess;
+}
+
+void duckdb_destroy_table_function_filter(duckdb_table_function_filter *filter) {
+        if (!filter || !*filter) {
+                return;
+        }
+        auto *internal = GetCTableFunctionFilter(*filter);
+	delete internal;
+	*filter = nullptr;
 }
 
 void duckdb_init_set_max_threads(duckdb_init_info info, idx_t max_threads) {
