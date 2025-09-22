@@ -53,8 +53,8 @@ void my_function(duckdb_function_info info, duckdb_data_chunk output) {
 }
 
 static void capi_register_table_function(duckdb_connection connection, const char *name,
-					 duckdb_table_function_bind_t bind, duckdb_table_function_init_t init,
-					 duckdb_table_function_t f, duckdb_state expected_state = DuckDBSuccess) {
+                                         duckdb_table_function_bind_t bind, duckdb_table_function_init_t init,
+                                         duckdb_table_function_t f, duckdb_state expected_state = DuckDBSuccess) {
 	duckdb_state status;
 	// create a table function
 	auto function = duckdb_create_table_function();
@@ -385,8 +385,8 @@ static capi_expected_filter_node MakeConstantNode(duckdb_table_filter_operator o
 	return node;
 }
 
-static capi_expected_filter_node
-MakeConjunctionNode(duckdb_table_filter_type type, std::vector<capi_expected_filter_node> children) {
+static capi_expected_filter_node MakeConjunctionNode(duckdb_table_filter_type type,
+                                                     std::vector<capi_expected_filter_node> children) {
 	capi_expected_filter_node node;
 	node.type = type;
 	node.column_index = 0;
@@ -447,25 +447,20 @@ void capi_filter_pushdown_bind(duckdb_bind_info info) {
 }
 
 void capi_filter_pushdown_init(duckdb_init_info info) {
-        capi_last_filters.clear();
-        capi_last_filter_count = duckdb_init_get_filter_count(info);
-        for (idx_t i = 0; i < capi_last_filter_count; i++) {
-                duckdb_table_function_filter filter;
-                REQUIRE(duckdb_init_get_filter(info, i, &filter) == DuckDBSuccess);
-                REQUIRE(filter);
+	capi_last_filters.clear();
+	capi_last_filter_count = duckdb_init_get_filter_count(info);
+	for (idx_t i = 0; i < capi_last_filter_count; i++) {
+		duckdb_table_function_filter filter;
+		REQUIRE(duckdb_init_get_filter(info, i, &filter) == DuckDBSuccess);
+		REQUIRE(filter);
 
-                capi_last_filters.push_back(CaptureFilterNode(filter));
-                duckdb_destroy_table_function_filter(&filter);
-        }
+		capi_last_filters.push_back(CaptureFilterNode(filter));
+		duckdb_destroy_table_function_filter(&filter);
+	}
 }
 
 void capi_filter_pushdown_function(duckdb_function_info info, duckdb_data_chunk output) {
-	auto vec = duckdb_data_chunk_get_vector(output, 0);
-	auto data = static_cast<int64_t *>(duckdb_vector_get_data(vec));
-	for (idx_t i = 0; i < 10; i++) {
-		data[i] = static_cast<int64_t>(i);
-	}
-	duckdb_data_chunk_set_size(output, 10);
+	duckdb_data_chunk_set_size(output, 0);
 }
 
 static void capi_register_filter_pushdown_function(duckdb_connection connection, const char *name) {
@@ -480,39 +475,37 @@ static void capi_register_filter_pushdown_function(duckdb_connection connection,
 	duckdb_destroy_table_function(&function);
 }
 
-TEST_CASE("Table function filter pushdown via C API") {
+TEST_CASE("Table function filter pushdown via C API", "[capi]") {
 	CAPITester tester;
 	duckdb::unique_ptr<CAPIResult> result;
 
 	REQUIRE(tester.OpenDatabase(nullptr));
 	capi_register_filter_pushdown_function(tester.connection, "capi_filter_pushdown");
 
-        struct QueryExpectation {
-                const char *query;
-                std::vector<capi_expected_filter_node> expected_filters;
-        };
+	struct QueryExpectation {
+		const char *query;
+		std::vector<capi_expected_filter_node> expected_filters;
+	};
 
-        std::vector<QueryExpectation> expectations = {
-            {"SELECT * FROM capi_filter_pushdown() WHERE value = 5", {MakeConstantNode(DUCKDB_TABLE_FILTER_OPERATOR_EQUAL, 5)}},
-            {"SELECT * FROM capi_filter_pushdown() WHERE value != 3",
-             {MakeConstantNode(DUCKDB_TABLE_FILTER_OPERATOR_NOT_EQUAL, 3)}},
-            {"SELECT * FROM capi_filter_pushdown() WHERE value > 7",
-             {MakeConstantNode(DUCKDB_TABLE_FILTER_OPERATOR_GREATER_THAN, 7)}},
-            {"SELECT * FROM capi_filter_pushdown() WHERE value >= 8",
-             {MakeConstantNode(DUCKDB_TABLE_FILTER_OPERATOR_GREATER_THAN_OR_EQUAL, 8)}},
-            {"SELECT * FROM capi_filter_pushdown() WHERE value < 4",
-             {MakeConstantNode(DUCKDB_TABLE_FILTER_OPERATOR_LESS_THAN, 4)}},
-            {"SELECT * FROM capi_filter_pushdown() WHERE value <= 6",
-             {MakeConstantNode(DUCKDB_TABLE_FILTER_OPERATOR_LESS_THAN_OR_EQUAL, 6)}},
-            {"SELECT * FROM capi_filter_pushdown() WHERE value BETWEEN 2 AND 6",
-             {MakeConjunctionNode(DUCKDB_TABLE_FILTER_TYPE_CONJUNCTION_AND,
-                                 {MakeConstantNode(DUCKDB_TABLE_FILTER_OPERATOR_GREATER_THAN_OR_EQUAL, 2),
-                                  MakeConstantNode(DUCKDB_TABLE_FILTER_OPERATOR_LESS_THAN_OR_EQUAL, 6)})}},
-            {"SELECT * FROM capi_filter_pushdown() WHERE value = 5 OR value = 7",
-             {MakeConjunctionNode(DUCKDB_TABLE_FILTER_TYPE_CONJUNCTION_OR,
-                                 {MakeConstantNode(DUCKDB_TABLE_FILTER_OPERATOR_EQUAL, 5),
-                                  MakeConstantNode(DUCKDB_TABLE_FILTER_OPERATOR_EQUAL, 7)})}}
-        };
+	std::vector<QueryExpectation> expectations = {
+	    {"SELECT * FROM capi_filter_pushdown() WHERE value = 5",
+	     {MakeConstantNode(DUCKDB_TABLE_FILTER_OPERATOR_EQUAL, 5)}},
+	    {"SELECT * FROM capi_filter_pushdown() WHERE value != 3",
+	     {MakeConstantNode(DUCKDB_TABLE_FILTER_OPERATOR_NOT_EQUAL, 3)}},
+	    {"SELECT * FROM capi_filter_pushdown() WHERE value > 7",
+	     {MakeConstantNode(DUCKDB_TABLE_FILTER_OPERATOR_GREATER_THAN, 7)}},
+	    {"SELECT * FROM capi_filter_pushdown() WHERE value >= 8",
+	     {MakeConstantNode(DUCKDB_TABLE_FILTER_OPERATOR_GREATER_THAN_OR_EQUAL, 8)}},
+	    {"SELECT * FROM capi_filter_pushdown() WHERE value < 4",
+	     {MakeConstantNode(DUCKDB_TABLE_FILTER_OPERATOR_LESS_THAN, 4)}},
+	    {"SELECT * FROM capi_filter_pushdown() WHERE value <= 6",
+	     {MakeConstantNode(DUCKDB_TABLE_FILTER_OPERATOR_LESS_THAN_OR_EQUAL, 6)}},
+	    {"SELECT * FROM capi_filter_pushdown() WHERE value BETWEEN 2 AND 6",
+	     {MakeConjunctionNode(DUCKDB_TABLE_FILTER_TYPE_CONJUNCTION_AND,
+	                          {MakeConstantNode(DUCKDB_TABLE_FILTER_OPERATOR_GREATER_THAN_OR_EQUAL, 2),
+	                           MakeConstantNode(DUCKDB_TABLE_FILTER_OPERATOR_LESS_THAN_OR_EQUAL, 6)})}},
+	    // No filters for this case, since the optimizer doesn't attempt to push OR clauses into scans
+	    {"SELECT * FROM capi_filter_pushdown() WHERE value = 5 OR value = 7", {}}};
 
 	for (auto &expectation : expectations) {
 		capi_last_filters.clear();
