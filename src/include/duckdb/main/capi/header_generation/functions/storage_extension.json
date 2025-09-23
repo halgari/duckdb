@@ -1,0 +1,435 @@
+{
+    "group": "storage_extension",
+    "deprecated": false,
+    "entries": [
+        {
+            "name": "duckdb_create_storage_extension",
+            "return_type": "duckdb_storage_extension",
+            "params": [],
+            "comment": {
+                "description": "Creates a new storage extension handle.\n\n",
+                "return_value": "The created storage extension handle."
+            }
+        },
+        {
+            "name": "duckdb_destroy_storage_extension",
+            "return_type": "void",
+            "params": [
+                {
+                    "type": "duckdb_storage_extension *",
+                    "name": "extension"
+                }
+            ],
+            "comment": {
+                "description": "Destroys a storage extension handle that was not registered with a config.\n\n",
+                "param_comments": {
+                    "extension": "The storage extension handle to destroy."
+                }
+            }
+        },
+        {
+            "name": "duckdb_storage_extension_set_extra_info",
+            "return_type": "void",
+            "params": [
+                {
+                    "type": "duckdb_storage_extension",
+                    "name": "extension"
+                },
+                {
+                    "type": "void *",
+                    "name": "extra_info"
+                },
+                {
+                    "type": "duckdb_delete_callback_t",
+                    "name": "destroy"
+                }
+            ],
+            "comment": {
+                "description": "Associates custom user data with the storage extension.\n\n",
+                "param_comments": {
+                    "extension": "The storage extension handle.",
+                    "extra_info": "User data that will be available in callbacks.",
+                    "destroy": "Optional destructor for the user data."
+                }
+            }
+        },
+        {
+            "name": "duckdb_storage_extension_get_extra_info",
+            "return_type": "void *",
+            "params": [
+                {
+                    "type": "duckdb_storage_extension",
+                    "name": "extension"
+                }
+            ],
+            "comment": {
+                "description": "Retrieves the user data associated with the storage extension.\n\n",
+                "param_comments": {
+                    "extension": "The storage extension handle."
+                },
+                "return_value": "The user data pointer or nullptr."
+            }
+        },
+        {
+            "name": "duckdb_storage_extension_set_attach",
+            "return_type": "void",
+            "params": [
+                {
+                    "type": "duckdb_storage_extension",
+                    "name": "extension"
+                },
+                {
+                    "type": "duckdb_storage_attach_t",
+                    "name": "attach"
+                }
+            ],
+            "comment": {
+                "description": "Sets the attach callback for the storage extension.\n\n",
+                "param_comments": {
+                    "extension": "The storage extension handle.",
+                    "attach": "The attach callback."
+                }
+            }
+        },
+        {
+            "name": "duckdb_storage_extension_set_transaction",
+            "return_type": "void",
+            "params": [
+                {
+                    "type": "duckdb_storage_extension",
+                    "name": "extension"
+                },
+                {
+                    "type": "duckdb_storage_create_transaction_t",
+                    "name": "create_transaction"
+                }
+            ],
+            "comment": {
+                "description": "Sets the transaction manager creation callback for the storage extension.\n\n",
+                "param_comments": {
+                    "extension": "The storage extension handle.",
+                    "create_transaction": "The transaction manager callback."
+                }
+            }
+        },
+        {
+            "name": "duckdb_config_add_storage_extension",
+            "return_type": "duckdb_state",
+            "params": [
+                {
+                    "type": "duckdb_config",
+                    "name": "config"
+                },
+                {
+                    "type": "const char *",
+                    "name": "type"
+                },
+                {
+                    "type": "duckdb_storage_extension",
+                    "name": "extension"
+                }
+            ],
+            "comment": {
+                "description": "Registers the storage extension with a configuration object. After registration the extension handle becomes invalid.\n\n",
+                "param_comments": {
+                    "config": "The configuration that will own the storage extension.",
+                    "type": "The database type identifier handled by the extension.",
+                    "extension": "The storage extension handle."
+                },
+                "return_value": "Returns DuckDBSuccess on success or DuckDBError otherwise."
+            }
+        },
+        {
+            "name": "duckdb_attach_info_get_name",
+            "return_type": "const char *",
+            "params": [
+                {
+                    "type": "duckdb_attach_info",
+                    "name": "info"
+                }
+            ],
+            "comment": {
+                "description": "Retrieves the catalog name used for the attachment.\n\n",
+                "param_comments": {
+                    "info": "The attach callback information."
+                },
+                "return_value": "The catalog name."
+            }
+        },
+        {
+            "name": "duckdb_attach_info_get_path",
+            "return_type": "const char *",
+            "params": [
+                {
+                    "type": "duckdb_attach_info",
+                    "name": "info"
+                }
+            ],
+            "comment": {
+                "description": "Retrieves the path that is being attached.\n\n",
+                "param_comments": {
+                    "info": "The attach callback information."
+                },
+                "return_value": "The database path."
+            }
+        },
+        {
+            "name": "duckdb_attach_info_set_path",
+            "return_type": "void",
+            "params": [
+                {
+                    "type": "duckdb_attach_info",
+                    "name": "info"
+                },
+                {
+                    "type": "const char *",
+                    "name": "path"
+                }
+            ],
+            "comment": {
+                "description": "Updates the path that should be attached.\n\n",
+                "param_comments": {
+                    "info": "The attach callback information.",
+                    "path": "The new path to attach."
+                }
+            }
+        },
+        {
+            "name": "duckdb_attach_info_set_duck_catalog",
+            "return_type": "void",
+            "params": [
+                {
+                    "type": "duckdb_attach_info",
+                    "name": "info"
+                }
+            ],
+            "comment": {
+                "description": "Configures the attach callback to use DuckDB's default catalog implementation.\n\n",
+                "param_comments": {
+                    "info": "The attach callback information."
+                }
+            }
+        },
+        {
+            "name": "duckdb_attach_info_set_error",
+            "return_type": "void",
+            "params": [
+                {
+                    "type": "duckdb_attach_info",
+                    "name": "info"
+                },
+                {
+                    "type": "const char *",
+                    "name": "error"
+                }
+            ],
+            "comment": {
+                "description": "Reports an error for the attach callback, aborting the attach.\n\n",
+                "param_comments": {
+                    "info": "The attach callback information.",
+                    "error": "The error message."
+                }
+            }
+        },
+        {
+            "name": "duckdb_attach_info_get_extra_info",
+            "return_type": "void *",
+            "params": [
+                {
+                    "type": "duckdb_attach_info",
+                    "name": "info"
+                }
+            ],
+            "comment": {
+                "description": "Retrieves the user data configured on the storage extension.\n\n",
+                "param_comments": {
+                    "info": "The attach callback information."
+                },
+                "return_value": "The user data pointer or nullptr."
+            }
+        },
+        {
+            "name": "duckdb_attach_info_get_client_context",
+            "return_type": "void",
+            "params": [
+                {
+                    "type": "duckdb_attach_info",
+                    "name": "info"
+                },
+                {
+                    "type": "duckdb_client_context *",
+                    "name": "out_context"
+                }
+            ],
+            "comment": {
+                "description": "Retrieves the client context in which the attach is executed.\n\n",
+                "param_comments": {
+                    "info": "The attach callback information.",
+                    "out_context": "Where to store the retrieved client context handle."
+                }
+            }
+        },
+        {
+            "name": "duckdb_attach_info_get_option_varchar",
+            "return_type": "bool",
+            "params": [
+                {
+                    "type": "duckdb_attach_info",
+                    "name": "info"
+                },
+                {
+                    "type": "const char *",
+                    "name": "key"
+                },
+                {
+                    "type": "const char **",
+                    "name": "out_value"
+                }
+            ],
+            "comment": {
+                "description": "Retrieves a string attach option if it was provided.\n\n",
+                "param_comments": {
+                    "info": "The attach callback information.",
+                    "key": "The option name.",
+                    "out_value": "Where to store the option value."
+                },
+                "return_value": "Returns true if the option was found."
+            }
+        },
+        {
+            "name": "duckdb_attach_info_get_option_boolean",
+            "return_type": "bool",
+            "params": [
+                {
+                    "type": "duckdb_attach_info",
+                    "name": "info"
+                },
+                {
+                    "type": "const char *",
+                    "name": "key"
+                },
+                {
+                    "type": "bool *",
+                    "name": "out_value"
+                }
+            ],
+            "comment": {
+                "description": "Retrieves a boolean attach option if it was provided.\n\n",
+                "param_comments": {
+                    "info": "The attach callback information.",
+                    "key": "The option name.",
+                    "out_value": "Where to store the option value."
+                },
+                "return_value": "Returns true if the option was found."
+            }
+        },
+        {
+            "name": "duckdb_attach_info_get_option_bigint",
+            "return_type": "bool",
+            "params": [
+                {
+                    "type": "duckdb_attach_info",
+                    "name": "info"
+                },
+                {
+                    "type": "const char *",
+                    "name": "key"
+                },
+                {
+                    "type": "int64_t *",
+                    "name": "out_value"
+                }
+            ],
+            "comment": {
+                "description": "Retrieves an integer attach option if it was provided.\n\n",
+                "param_comments": {
+                    "info": "The attach callback information.",
+                    "key": "The option name.",
+                    "out_value": "Where to store the option value."
+                },
+                "return_value": "Returns true if the option was found."
+            }
+        },
+        {
+            "name": "duckdb_attach_info_get_option_double",
+            "return_type": "bool",
+            "params": [
+                {
+                    "type": "duckdb_attach_info",
+                    "name": "info"
+                },
+                {
+                    "type": "const char *",
+                    "name": "key"
+                },
+                {
+                    "type": "double *",
+                    "name": "out_value"
+                }
+            ],
+            "comment": {
+                "description": "Retrieves a double attach option if it was provided.\n\n",
+                "param_comments": {
+                    "info": "The attach callback information.",
+                    "key": "The option name.",
+                    "out_value": "Where to store the option value."
+                },
+                "return_value": "Returns true if the option was found."
+            }
+        },
+        {
+            "name": "duckdb_transaction_info_set_duck_transaction_manager",
+            "return_type": "void",
+            "params": [
+                {
+                    "type": "duckdb_transaction_info",
+                    "name": "info"
+                }
+            ],
+            "comment": {
+                "description": "Configures the transaction callback to use DuckDB's default transaction manager.\n\n",
+                "param_comments": {
+                    "info": "The transaction manager callback information."
+                }
+            }
+        },
+        {
+            "name": "duckdb_transaction_info_set_error",
+            "return_type": "void",
+            "params": [
+                {
+                    "type": "duckdb_transaction_info",
+                    "name": "info"
+                },
+                {
+                    "type": "const char *",
+                    "name": "error"
+                }
+            ],
+            "comment": {
+                "description": "Reports an error for the transaction manager callback.\n\n",
+                "param_comments": {
+                    "info": "The transaction manager callback information.",
+                    "error": "The error message."
+                }
+            }
+        },
+        {
+            "name": "duckdb_transaction_info_get_extra_info",
+            "return_type": "void *",
+            "params": [
+                {
+                    "type": "duckdb_transaction_info",
+                    "name": "info"
+                }
+            ],
+            "comment": {
+                "description": "Retrieves the user data configured on the storage extension for transaction callbacks.\n\n",
+                "param_comments": {
+                    "info": "The transaction manager callback information."
+                },
+                "return_value": "The user data pointer or nullptr."
+            }
+        }
+    ]
+}
