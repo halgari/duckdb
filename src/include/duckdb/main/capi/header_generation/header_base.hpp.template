@@ -686,6 +686,31 @@ typedef void (*duckdb_table_function_init_t)(duckdb_init_info info);
 typedef void (*duckdb_table_function_t)(duckdb_function_info info, duckdb_data_chunk output);
 
 //===--------------------------------------------------------------------===//
+// Storage extension types
+//===--------------------------------------------------------------------===//
+
+//! A storage extension handle. Must be destroyed with `duckdb_destroy_storage_extension` unless registered with a config.
+typedef struct _duckdb_storage_extension {
+        void *internal_ptr;
+} * duckdb_storage_extension;
+
+//! Attach callback information passed to storage extensions.
+typedef struct _duckdb_attach_info {
+        void *internal_ptr;
+} * duckdb_attach_info;
+
+//! Transaction manager callback information passed to storage extensions.
+typedef struct _duckdb_transaction_info {
+        void *internal_ptr;
+} * duckdb_transaction_info;
+
+//! Callback invoked to create a catalog when attaching a storage extension.
+typedef void (*duckdb_storage_attach_t)(duckdb_attach_info info);
+
+//! Callback invoked to create a transaction manager for an attached storage extension.
+typedef void (*duckdb_storage_create_transaction_t)(duckdb_transaction_info info);
+
+//===--------------------------------------------------------------------===//
 // Cast types
 //===--------------------------------------------------------------------===//
 

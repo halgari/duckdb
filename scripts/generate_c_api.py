@@ -78,6 +78,7 @@ ORIGINAL_FUNCTION_GROUP_ORDER = [
     'table_description',
     'arrow_interface',
     'threading_information',
+    'storage_extension',
     'streaming_result_interface',
     'cast_functions',
     'expression_interface',

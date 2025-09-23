@@ -27,6 +27,7 @@ add_library_unity(
   table_description-c.cpp
   table_function-c.cpp
   threading-c.cpp
+  attach-c.cpp
   value-c.cpp)
 
 set(ALL_OBJECT_FILES

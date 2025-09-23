@@ -357,6 +357,27 @@
         "duckdb_append_varchar",
         "duckdb_append_varchar_length",
         "duckdb_append_blob",
-        "duckdb_append_null"
+        "duckdb_append_null",
+        "duckdb_create_storage_extension",
+        "duckdb_destroy_storage_extension",
+        "duckdb_storage_extension_set_extra_info",
+        "duckdb_storage_extension_get_extra_info",
+        "duckdb_storage_extension_set_attach",
+        "duckdb_storage_extension_set_transaction",
+        "duckdb_config_add_storage_extension",
+        "duckdb_attach_info_get_name",
+        "duckdb_attach_info_get_path",
+        "duckdb_attach_info_set_path",
+        "duckdb_attach_info_set_duck_catalog",
+        "duckdb_attach_info_set_error",
+        "duckdb_attach_info_get_extra_info",
+        "duckdb_attach_info_get_client_context",
+        "duckdb_attach_info_get_option_varchar",
+        "duckdb_attach_info_get_option_boolean",
+        "duckdb_attach_info_get_option_bigint",
+        "duckdb_attach_info_get_option_double",
+        "duckdb_transaction_info_set_duck_transaction_manager",
+        "duckdb_transaction_info_set_error",
+        "duckdb_transaction_info_get_extra_info"
     ]
 }
